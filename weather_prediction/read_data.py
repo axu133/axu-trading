@@ -134,11 +134,17 @@ class ERA5Dataset(Dataset):
     def __getitem__(self, idx):
         start_idx, target_val = self.valid_samples[idx]
 
-        seq = self.data[start_idx: start_idx + self.window_size]
+        seq = self.data[start_idx: start_idx + self.window_size] # [Days, Steps, Channels, Lat, Long]
 
-        data = torch.tensor(seq, dtype=torch.float32)
+        x = torch.from_numpy(seq)
+
+        x = x.permute(2, 0, 1, 3, 4)
+
+        C, D, S, H, W = x.shape
+        x = x.reshape(C, D * S, H, W) # [Channels, Time (Days * Steps), Lat, Long]
+
         target = torch.tensor(target_val, dtype=torch.float32)
-        return data, target
+        return x, target
 
 
 if __name__ == "__main__":
