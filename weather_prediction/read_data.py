@@ -1,6 +1,8 @@
 import pandas as pd
 import os
 import xarray as xr
+import numpy as np
+from preprocess import z_score_normalize
 
 def central_park_daily_max_min():
     """
@@ -13,18 +15,33 @@ def central_park_daily_max_min():
 
 def load_era5(month, year):
     """
-    Load ERA5 data for a specific month and year. Returns 6-hourly data as a pandas DataFrame.
+    Load ERA5 data for a specific month and year. Trims images to 64x64 and returns 6-hourly data as an xarray DataArray.
+
+    :param month: Month to load (1-12)
+    :param year: Year to load (e.g., 2015)
     """
-    file_path = os.path.join("data", "era5_raw", str(year), f"era5_{year}_{month:02d}.nc")
+    vars = ['t2m', 'u10', 'v10', 'msl', 'd2m']
+
+    file_path = os.path.join("data", "era5_raw", str(year), f"era5_{year}_{month:02d}.nc") # Path hardcoded
     ds = xr.open_dataset(file_path)
 
     subset = ds.sel(valid_time = ds.valid_time.dt.hour.isin([0, 6, 12, 18]))
 
-    return subset
+    trimmed = subset.isel(latitude=slice(0,64), longitude=slice(0,64))
+
+    batched = (
+        trimmed.coarsen(valid_time=4, boundary='trim')
+        .construct(valid_time=('batch','step'))
+    )
+
+    data = batched[vars].to_array(dim='channel').transpose('batch', 'step', 'channel', 'latitude', 'longitude')
+
+    time_index = batched['valid_time'].values
+
+    return data, time_index
 
 if __name__ == "__main__":
     #data = central_park_daily_max_min()
     #print(data["DATE"][0])
-    data = load_era5(1, 2015)[['t2m', 'u10', 'v10', 'msl', 'd2m']].to_array(dim='channel')
-    data = data.transpose('valid_time', 'channel', 'latitude', 'longitude')
+    data, _ = load_era5(6, 2015)
     print(data)
