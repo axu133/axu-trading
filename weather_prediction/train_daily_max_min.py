@@ -49,11 +49,13 @@ if __name__ == "__main__":
         model.train()
         t1 = default_timer()
         total_train_loss = 0.0
-        for batch_data, batch_target in train_loader:
-            batch_data, batch_target = batch_data.to(device), batch_target.to(device)
+        for batch_data, batch_target, batch_baseline in train_loader:
+            batch_data, batch_target, batch_baseline = (batch_data.to(device), 
+                                                            batch_target.to(device).view(-1, 1), 
+                                                            batch_baseline.to(device).view(-1, 1))  
             
             y = model(batch_data)
-            loss = loss_fn(y, batch_target.view(-1, 1))
+            loss = loss_fn(y, batch_target)
             optimizer.zero_grad()
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
@@ -63,11 +65,13 @@ if __name__ == "__main__":
         model.eval()
         total_test_loss = 0.0
         with torch.no_grad():
-            for batch_data, batch_target in test_loader:
-                batch_data, batch_target = batch_data.to(device), batch_target.to(device)
+            for batch_data, batch_target, batch_baseline in test_loader:
+                batch_data, batch_target, batch_baseline = (batch_data.to(device), 
+                                                            batch_target.to(device).view(-1, 1), 
+                                                            batch_baseline.to(device).view(-1, 1))    
 
                 preds = model(batch_data)
-                loss = loss_fn(preds, batch_target.view(-1, 1))
+                loss = loss_fn(preds, batch_target)
                 total_test_loss += loss.item() * batch_data.size(0)
             
         avg_train_loss = total_train_loss / train_size
