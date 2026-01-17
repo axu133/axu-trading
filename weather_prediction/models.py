@@ -21,7 +21,7 @@ class Weather3DCNN(nn.Module):
             nn.Flatten(),
             nn.Linear(128, 64),
             nn.ReLU(),
-            nn.Dropout(0.2),
+            nn.Dropout(0.0),
             nn.Linear(64, 1)
         )
     

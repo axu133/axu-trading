@@ -10,14 +10,14 @@ import os
 
 seed_num = 1
 torch.manual_seed(seed_num)
-torch.mps.manual_seed_all(seed_num)
 device = 'mps' if torch.backends.mps.is_available() else 'cpu'
-model_directory = 'models/'
+model_directory = 'weather_prediction/models/'
 date_str = date.today().strftime("%Y%m%d")
 min_or_max = 'max'
+years = range(2015, 2026)
 
 if __name__ == "__main__":
-    dataset = ERA5Dataset(years=range(2015, 2016), window_size=5, max_or_min=min_or_max)
+    dataset = ERA5Dataset(years=years, window_size=5, max_or_min=min_or_max)
 
     model = Weather3DCNN(input_channels=5, input_frames=20).to(device)
     stopper = EarlyStopping(patience=10, min_delta=0.0001)
@@ -29,41 +29,45 @@ if __name__ == "__main__":
 
     batch_size = 64
 
-    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory=True)
-    test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory=True)
+    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=4)
+    test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size, shuffle=True, num_workers=4)
 
-    lr = 0.001
+    lr = 3e-4
+    weight_decay = 1e-4
     num_epochs = 500
-    optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=3, factor=0.5)
-    loss_fn = nn.MSELoss()
+    optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=8, factor=0.5)
+    loss_fn = nn.HuberLoss(delta=1.0)
 
     train_losses = []
     test_losses = []
     min_test_loss = np.inf
 
+    print("Training begin")
+
     for i in range(num_epochs):
         model.train()
         t1 = default_timer()
         total_train_loss = 0.0
-        for batch_data, batch_target in train_dataset:
+        for batch_data, batch_target in train_loader:
             batch_data, batch_target = batch_data.to(device), batch_target.to(device)
             
             y = model(batch_data)
-            loss = loss_fn(y, batch_target)
+            loss = loss_fn(y, batch_target.view(-1, 1))
             optimizer.zero_grad()
             loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
             optimizer.step()
             total_train_loss += loss.item() * batch_data.size(0)
         
         model.eval()
+        total_test_loss = 0.0
         with torch.no_grad():
-            for batch_data, batch_target in test_dataset:
-                total_test_loss = 0.0
+            for batch_data, batch_target in test_loader:
                 batch_data, batch_target = batch_data.to(device), batch_target.to(device)
 
                 preds = model(batch_data)
-                loss = loss_fn(preds, batch_target)
+                loss = loss_fn(preds, batch_target.view(-1, 1))
                 total_test_loss += loss.item() * batch_data.size(0)
             
         avg_train_loss = total_train_loss / train_size
@@ -83,6 +87,6 @@ if __name__ == "__main__":
             print("Early stopping triggered.")
             break
 
-    model_path = os.path.join(model_directory, f'daily_max_model_{date_str}_{min_or_max}.pth')
+    model_path = os.path.join(model_directory, f'daily_max_model_{min(years)}-{max(years)}_{min_or_max}_{date_str}.pth')
     torch.save(best_model_state.state_dict(), model_path)
             
