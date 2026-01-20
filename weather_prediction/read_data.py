@@ -143,8 +143,13 @@ class ERA5Dataset(Dataset):
         C, D, S, H, W = x.shape
         x = x.reshape(C, D * S, H, W) # [Channels, Time (Days * Steps), Lat, Long]
 
-        target = torch.tensor(target_val, dtype=torch.float32)
-        return x, target
+        previous_day_target = x[3, -4:, :, :].max().item()
+
+        residual = target_val - previous_day_target
+
+        target = torch.tensor(residual, dtype=torch.float32)
+        baseline = torch.tensor(previous_day_target, dtype=torch.float32)
+        return x, target, baseline
 
 
 if __name__ == "__main__":
