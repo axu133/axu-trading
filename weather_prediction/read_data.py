@@ -16,31 +16,42 @@ def central_park_daily_max_min():
     df['DATE'] = pd.to_datetime(df['DATE'])
     return df
 
-def load_era5(month, year):
+def load_era5(month, year, data_root="data"):
     """
     Load ERA5 data for a specific month and year. Trims images to 64x64 and returns 6-hourly data as an xarray DataArray.
+    Uses data/clean_data/era5_YYYY.nc when present (one file per year); otherwise data/era5_raw/YYYY/era5_YYYY_MM.nc.
 
     :param month: Month to load (1-12)
     :param year: Year to load (e.g., 2015)
+    :param data_root: Root data directory (default "data")
     """
     vars = ['t2m', 'u10', 'v10', 'msl', 'd2m']
+    time_dim = "valid_time"  # CDS may use "time"; we normalize below
 
-    file_path = os.path.join("data", "era5_raw", str(year), f"era5_{year}_{month:02d}.nc") # Path hardcoded
-    ds = xr.open_dataset(file_path)
+    clean_path = os.path.join(data_root, "clean_data", f"era5_{year}.nc")
+    raw_path = os.path.join(data_root, "era5_raw", str(year), f"era5_{year}_{month:02d}.nc")
 
-    subset = ds.sel(valid_time = ds.valid_time.dt.hour.isin([0, 6, 12, 18]))
+    if os.path.isfile(clean_path):
+        ds = xr.open_dataset(clean_path)
+        # Combined file may use "time" or "valid_time"
+        if "time" in ds.dims and "valid_time" not in ds.dims:
+            ds = ds.rename({"time": "valid_time"})
+        # Select this month
+        ds = ds.sel(valid_time=ds.valid_time.dt.month == month)
+    else:
+        ds = xr.open_dataset(raw_path)
 
-    trimmed = subset.isel(latitude=slice(0,64), longitude=slice(0,64))
+    subset = ds.sel(valid_time=ds.valid_time.dt.hour.isin([0, 6, 12, 18]))
+    trimmed = subset.isel(latitude=slice(0, 64), longitude=slice(0, 64))
 
     batched = (
         trimmed.coarsen(valid_time=4, boundary='trim')
-        .construct(valid_time=('batch','step'))
+        .construct(valid_time=('batch', 'step'))
     )
 
     data = batched[vars].to_array(dim='channel').transpose('batch', 'step', 'channel', 'latitude', 'longitude')
-
     time_index = batched['valid_time'].isel(step=0).values
-
+    ds.close()
     return data, time_index
 
 def align_dates(era5, labels, target_col = "TMAX", lag_days = 5):
