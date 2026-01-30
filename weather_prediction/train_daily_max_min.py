@@ -1,4 +1,5 @@
 import torch
+from torch.amp import autocast, GradScaler
 import torch.nn as nn
 import numpy as np
 from read_data import ERA5Dataset
@@ -20,7 +21,12 @@ comments = "_ResNet_"
 if __name__ == "__main__":
     dataset = ERA5Dataset(years=years, window_size=5, max_or_min=min_or_max)
 
-    model = WeatherResNet3D(input_channels=5, input_frames=20).to(device)
+    model = WeatherResNet3D(input_channels=5, input_frames=20)
+    
+    if torch.cuda.device_count() > 1:
+        model = nn.DataParallel(model)
+        
+    model = model.to(device)
     stopper = EarlyStopping(patience=10, min_delta=0.0001)
 
     total_samples = len(dataset)
@@ -28,10 +34,10 @@ if __name__ == "__main__":
     test_size = total_samples - train_size
     train_dataset, test_dataset = torch.utils.data.random_split(dataset, [train_size, test_size])
 
-    batch_size = 48
+    batch_size = 32
 
-    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=0)
-    test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size, shuffle=True, num_workers=0)
+    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory = True)
+    test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory = True)
 
     lr = 3e-4
     weight_decay = 1e-4
@@ -39,6 +45,7 @@ if __name__ == "__main__":
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=8, factor=0.5)
     loss_fn = nn.HuberLoss(delta=1.0)
+    scaler = GradScaler()
 
     train_losses = []
     test_losses = []
@@ -50,17 +57,26 @@ if __name__ == "__main__":
         model.train()
         t1 = default_timer()
         total_train_loss = 0.0
+        
         for batch_data, batch_target, batch_baseline in train_loader:
             batch_data, batch_target, batch_baseline = (batch_data.to(device), 
                                                             batch_target.to(device).view(-1, 1), 
                                                             batch_baseline.to(device).view(-1, 1))  
             
-            y = model(batch_data)
-            loss = loss_fn(y, batch_target)
             optimizer.zero_grad()
-            loss.backward()
+            
+            with autocast(device_type='cuda', dtype=torch.float16):
+                y = model(batch_data)
+                loss = loss_fn(y, batch_target)
+                
+            scaler.scale(loss).backward()
+            
+            scaler.unscale_(optimizer)
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
-            optimizer.step()
+            
+            scaler.step(optimizer)
+            scaler.update()
+            
             total_train_loss += loss.item() * batch_data.size(0)
         
         model.eval()

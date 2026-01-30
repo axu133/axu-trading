@@ -1,9 +1,10 @@
 #!/bin/bash
 
 #SBATCH --job-name=WeatherPred
-#SBATCH --output=Train.txt
+#SBATCH --output=train_multi.txt
 #SBATCH --partition=gpu
-#SBATCH --gpus=a5000:1
+#SBATCH --gpus=a5000:2
+#SBATCH --ntasks=1
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=200G
 #SBATCH --time=48:00:00	
@@ -12,4 +13,4 @@
 module load miniconda
 conda activate mjo_env_1
 
-python weather_prediction/train_daily_max_min.py
+python -u weather_prediction/train_daily_max_min.py

@@ -1,0 +1,47 @@
+Running inference on cuda...
+Loading dataset...
+Loading weights from: weather_prediction/models/daily_max_model_1980-2025_max_ResNet_20260121.pth
+Starting evaluation...
+Traceback (most recent call last):
+  File "/vast/palmer/home.grace/ax59/axu-trading/weather_prediction/test.py", line 84, in <module>
+    preds = model(batch_data)
+  File "/home/ax59/.conda/envs/mjo_env_1/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1751, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/home/ax59/.conda/envs/mjo_env_1/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1762, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/vast/palmer/home.grace/ax59/axu-trading/weather_prediction/models.py", line 76, in forward
+    x = self.layer1(x)
+  File "/home/ax59/.conda/envs/mjo_env_1/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1751, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/home/ax59/.conda/envs/mjo_env_1/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1762, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/vast/palmer/home.grace/ax59/axu-trading/weather_prediction/models.py", line 48, in forward
+    out = self.bn2(self.conv2(out))
+  File "/home/ax59/.conda/envs/mjo_env_1/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1751, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/home/ax59/.conda/envs/mjo_env_1/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1762, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/ax59/.conda/envs/mjo_env_1/lib/python3.13/site-packages/torch/nn/modules/batchnorm.py", line 193, in forward
+    return F.batch_norm(
+           ~~~~~~~~~~~~^
+        input,
+        ^^^^^^
+    ...<9 lines>...
+        self.eps,
+        ^^^^^^^^^
+    )
+    ^
+  File "/home/ax59/.conda/envs/mjo_env_1/lib/python3.13/site-packages/torch/nn/functional.py", line 2822, in batch_norm
+    return torch.batch_norm(
+           ~~~~~~~~~~~~~~~~^
+        input,
+        ^^^^^^
+    ...<7 lines>...
+        torch.backends.cudnn.enabled,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 5.62 GiB. GPU 0 has a total capacity of 23.56 GiB of which 367.25 MiB is free. Including non-PyTorch memory, this process has 23.19 GiB memory in use. Of the allocated memory 17.33 GiB is allocated by PyTorch, and 5.62 GiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)

@@ -1,44 +1,29 @@
 Training begin
-Epoch: 1, Avg Train Loss: 50.26819952430736, Avg Test Loss: 35.38253263745989, LR: [0.0003], Time taken: 264.98063982091844
-Epoch: 2, Avg Train Loss: 16.577559329882092, Avg Test Loss: 6.215209429604666, LR: [0.0003], Time taken: 265.4409195850603
-Epoch: 3, Avg Train Loss: 5.284802667510477, Avg Test Loss: 4.765604077066694, LR: [0.0003], Time taken: 266.2088848990388
-Epoch: 4, Avg Train Loss: 4.5526887699762035, Avg Test Loss: 4.2611720596041, LR: [0.0003], Time taken: 266.1248052739538
-Epoch: 5, Avg Train Loss: 4.353672810486648, Avg Test Loss: 3.885333091872079, LR: [0.0003], Time taken: 266.0481534716673
-Epoch: 6, Avg Train Loss: 4.402612626676795, Avg Test Loss: 3.9204764400209697, LR: [0.0003], Time taken: 266.04797015618533
-Epoch: 7, Avg Train Loss: 4.165140623278332, Avg Test Loss: 5.286645122936794, LR: [0.0003], Time taken: 266.0584995369427
-Epoch: 8, Avg Train Loss: 4.046318058316003, Avg Test Loss: 4.84983013016837, LR: [0.0003], Time taken: 266.05971124814823
-Epoch: 9, Avg Train Loss: 3.9839149701094905, Avg Test Loss: 5.042542893545968, LR: [0.0003], Time taken: 266.0484106140211
-Epoch: 10, Avg Train Loss: 3.9305253280845203, Avg Test Loss: 4.497637598855155, LR: [0.0003], Time taken: 266.03291035676375
-Epoch: 11, Avg Train Loss: 3.941672177213968, Avg Test Loss: 3.970603782790048, LR: [0.0003], Time taken: 266.2158481129445
-Epoch: 12, Avg Train Loss: 3.828646700167166, Avg Test Loss: 4.540024147714887, LR: [0.0003], Time taken: 266.31401866674423
-Epoch: 13, Avg Train Loss: 3.7934694153171593, Avg Test Loss: 4.523584563391549, LR: [0.0003], Time taken: 266.2400509840809
-Epoch: 14, Avg Train Loss: 3.7581456202983716, Avg Test Loss: 3.456332050051008, LR: [0.0003], Time taken: 266.06955407513306
-Epoch: 15, Avg Train Loss: 3.6818479362361733, Avg Test Loss: 3.7082889999662125, LR: [0.0003], Time taken: 266.11828510137275
-Epoch: 16, Avg Train Loss: 3.7064402272354178, Avg Test Loss: 3.9337084940501623, LR: [0.0003], Time taken: 266.05371689004824
-Epoch: 17, Avg Train Loss: 3.6224462829128763, Avg Test Loss: 4.255241373607091, LR: [0.0003], Time taken: 266.07053688913584
-Epoch: 18, Avg Train Loss: 3.616771452339606, Avg Test Loss: 3.5718900646482195, LR: [0.0003], Time taken: 266.09916132781655
-Epoch: 19, Avg Train Loss: 3.57463242248894, Avg Test Loss: 3.817831976073129, LR: [0.0003], Time taken: 265.61681489506736
-Epoch: 20, Avg Train Loss: 3.5322204460945823, Avg Test Loss: 3.445795566695077, LR: [0.0003], Time taken: 265.6524247918278
-Epoch: 21, Avg Train Loss: 3.506323871175318, Avg Test Loss: 3.688744126047407, LR: [0.0003], Time taken: 265.6140528717078
-Epoch: 22, Avg Train Loss: 3.5019003173076313, Avg Test Loss: 3.551276683807373, LR: [0.0003], Time taken: 265.709615143016
-Epoch: 23, Avg Train Loss: 3.573186798655018, Avg Test Loss: 3.3690409353801183, LR: [0.0003], Time taken: 265.8576245838776
-Epoch: 24, Avg Train Loss: 3.4588802609638147, Avg Test Loss: 3.4209557260785783, LR: [0.0003], Time taken: 265.81289894878864
-Epoch: 25, Avg Train Loss: 3.460439051783983, Avg Test Loss: 3.454642619405474, LR: [0.0003], Time taken: 265.69978161808103
-Epoch: 26, Avg Train Loss: 3.431960147986564, Avg Test Loss: 3.51557868208204, LR: [0.0003], Time taken: 265.6479987371713
-Epoch: 27, Avg Train Loss: 3.4490629110566275, Avg Test Loss: 3.496156600543431, LR: [0.0003], Time taken: 265.66176088294014
-Epoch: 28, Avg Train Loss: 3.4282842023133453, Avg Test Loss: 3.33785537311009, LR: [0.0003], Time taken: 265.7243632976897
-Epoch: 29, Avg Train Loss: 3.428571425367232, Avg Test Loss: 3.3570178372519357, LR: [0.0003], Time taken: 265.7999669709243
-Epoch: 30, Avg Train Loss: 3.382147322882141, Avg Test Loss: 3.426515555381775, LR: [0.0003], Time taken: 265.6670449823141
-Epoch: 31, Avg Train Loss: 3.347812069637075, Avg Test Loss: 3.4137495653969903, LR: [0.0003], Time taken: 265.5287076989189
-Epoch: 32, Avg Train Loss: 3.4354709446093055, Avg Test Loss: 3.268977447918483, LR: [0.0003], Time taken: 265.6433558310382
-Epoch: 33, Avg Train Loss: 3.3915141855332425, Avg Test Loss: 3.4351388590676444, LR: [0.0003], Time taken: 265.68583941599354
-Epoch: 34, Avg Train Loss: 3.3965085004901345, Avg Test Loss: 3.3196147441864015, LR: [0.0003], Time taken: 265.66076138895005
-Epoch: 35, Avg Train Loss: 3.3485068956206474, Avg Test Loss: 3.4213474205562044, LR: [0.0003], Time taken: 265.4784615319222
-Epoch: 36, Avg Train Loss: 3.3390577734492655, Avg Test Loss: 3.490043248449053, LR: [0.0003], Time taken: 265.50822501815856
-Epoch: 37, Avg Train Loss: 3.3626243324285463, Avg Test Loss: 3.5406953402927943, LR: [0.0003], Time taken: 265.6096200211905
-Epoch: 38, Avg Train Loss: 3.348130920807071, Avg Test Loss: 3.4583866221564157, LR: [0.0003], Time taken: 265.7878686869517
-Epoch: 39, Avg Train Loss: 3.28939945245648, Avg Test Loss: 3.875575702530997, LR: [0.0003], Time taken: 265.8605861500837
-Epoch: 40, Avg Train Loss: 3.310780681574334, Avg Test Loss: 3.5721308640071325, LR: [0.0003], Time taken: 265.7130041359924
-Epoch: 41, Avg Train Loss: 3.293330890857666, Avg Test Loss: 3.2954846688679287, LR: [0.00015], Time taken: 265.65974049828947
-Epoch: 42, Avg Train Loss: 3.1859317945915873, Avg Test Loss: 3.2743120193481445, LR: [0.00015], Time taken: 265.76363155292347
-Early stopping triggered.
+Traceback (most recent call last):
+  File "/vast/palmer/home.grace/ax59/axu-trading/weather_prediction/train_daily_max_min.py", line 58, in <module>
+    y = model(batch_data)
+  File "/home/ax59/.conda/envs/mjo_env_1/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1751, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/home/ax59/.conda/envs/mjo_env_1/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1762, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/vast/palmer/home.grace/ax59/axu-trading/weather_prediction/models.py", line 76, in forward
+    x = self.layer1(x)
+  File "/home/ax59/.conda/envs/mjo_env_1/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1751, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/home/ax59/.conda/envs/mjo_env_1/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1762, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/vast/palmer/home.grace/ax59/axu-trading/weather_prediction/models.py", line 47, in forward
+    out = self.relu(self.bn1(self.conv1(x)))
+  File "/home/ax59/.conda/envs/mjo_env_1/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1751, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/home/ax59/.conda/envs/mjo_env_1/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1762, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/ax59/.conda/envs/mjo_env_1/lib/python3.13/site-packages/torch/nn/modules/activation.py", line 133, in forward
+    return F.relu(input, inplace=self.inplace)
+           ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ax59/.conda/envs/mjo_env_1/lib/python3.13/site-packages/torch/nn/functional.py", line 1704, in relu
+    result = torch.relu(input)
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 5.62 GiB. GPU 0 has a total capacity of 23.56 GiB of which 379.25 MiB is free. Including non-PyTorch memory, this process has 23.18 GiB memory in use. Of the allocated memory 22.94 GiB is allocated by PyTorch, and 3.40 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)

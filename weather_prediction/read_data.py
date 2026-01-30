@@ -6,6 +6,9 @@ import xarray as xr
 import numpy as np
 from preprocess import z_score_normalize
 
+hours = range(0, 24) #[0, 6, 12, 18]
+nhours = len(hours)
+
 def central_park_daily_max_min():
     """
     Load daily max/min temperature for Central Park. Returns a DataFrame with columns DATE, TMAX, TMIN.
@@ -28,12 +31,12 @@ def load_era5(month, year):
     file_path = os.path.join("data", "era5_raw", str(year), f"era5_{year}_{month:02d}.nc") # Path hardcoded
     ds = xr.open_dataset(file_path)
 
-    subset = ds.sel(valid_time = ds.valid_time.dt.hour.isin([0, 6, 12, 18]))
+    subset = ds #.sel(valid_time = ds.valid_time.dt.hour.isin(hours))
 
     trimmed = subset.isel(latitude=slice(0,64), longitude=slice(0,64))
 
     batched = (
-        trimmed.coarsen(valid_time=4, boundary='trim')
+        trimmed.coarsen(valid_time=nhours, boundary='trim')
         .construct(valid_time=('batch','step'))
     )
 
@@ -83,7 +86,7 @@ class ERA5Dataset(Dataset):
                 time_index.append(era5_time_index)
 
         data = np.concatenate(data, axis=0)
-        self.data, _, _ = z_score_normalize(data)
+        self.data, self.mean, self.std = z_score_normalize(data)
 
         time_index = np.concatenate(time_index, axis=0)
 
@@ -143,7 +146,9 @@ class ERA5Dataset(Dataset):
         C, D, S, H, W = x.shape
         x = x.reshape(C, D * S, H, W) # [Channels, Time (Days * Steps), Lat, Long]
 
-        previous_day_target = x[3, -4:, :, :].max().item()
+        previous_day_target_norm = x[0, -nhours:, :, :].max().item()
+        
+        previous_day_target = previous_day_target_norm * self.std[0] + self.mean[0] - 273.15 # Unnormalizes, converts K to C
 
         residual = target_val - previous_day_target
 

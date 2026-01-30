@@ -31,7 +31,9 @@ def z_score_normalize(data, mean=None, std=None):
         mean = np.mean(data, axis=(0, 1, 3, 4), keepdims=True)
     if std is None:
         std = np.std(data, axis=(0, 1, 3, 4), keepdims=True)
+        
+    safe_std = std + 1e-8
     
-    z_normalized = (data - mean) / std
+    z_normalized = (data - mean) / safe_std
 
-    return z_normalized, mean, std
+    return z_normalized, mean.flatten(), safe_std.flatten()
