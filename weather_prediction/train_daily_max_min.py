@@ -16,7 +16,7 @@ model_directory = 'weather_prediction/models/'
 date_str = date.today().strftime("%Y%m%d")
 min_or_max = 'max'
 years = range(1980, 2026)
-comments = "_ResNet_"
+comments = "_Radiation_"
 
 if __name__ == "__main__":
     dataset = ERA5Dataset(years=years, window_size=5, max_or_min=min_or_max)
