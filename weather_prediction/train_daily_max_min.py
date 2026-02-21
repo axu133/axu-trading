@@ -21,7 +21,7 @@ comments = "_ResNet_"
 if __name__ == "__main__":
     dataset = ERA5Dataset(years=years, window_size=5, max_or_min=min_or_max)
 
-    model = WeatherResNet3D(input_channels=5, input_frames=20)
+    model = WeatherResNet3D(input_channels=dataset.n_channels, input_frames=20)
     
     if torch.cuda.device_count() > 1:
         model = nn.DataParallel(model)

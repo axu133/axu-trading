@@ -19,31 +19,51 @@ def central_park_daily_max_min():
     df['DATE'] = pd.to_datetime(df['DATE'])
     return df
 
-def load_era5(month, year):
+# Core variables used by the model; optional vars (ssrd, tcc) may exist in clean_data files.
+ERA5_CORE_VARS = ['t2m', 'u10', 'v10', 'msl', 'd2m']
+ERA5_OPTIONAL_VARS = ['ssrd', 'tcc']  # from combined .grib; use if present for extra channels
+
+
+def load_era5(month, year, data_root="data", use_optional_vars=True):
     """
-    Load ERA5 data for a specific month and year. Trims images to 64x64 and returns 6-hourly data as an xarray DataArray.
+    Load ERA5 data for a specific month and year. Trims to 64x64, returns (data, time_index).
+    Prefers data/clean_data/era5_YYYY.nc when present (one file per year); else data/era5_raw/YYYY/era5_YYYY_MM.nc.
 
     :param month: Month to load (1-12)
     :param year: Year to load (e.g., 2015)
+    :param data_root: Root data directory (default "data")
+    :param use_optional_vars: If True (default), include ssrd/tcc when present (7 channels); else core only (5).
     """
-    vars = ['t2m', 'u10', 'v10', 'msl', 'd2m']
+    clean_path = os.path.join(data_root, "clean_data", f"era5_{year}.nc")
+    raw_path = os.path.join(data_root, "era5_raw", str(year), f"era5_{year}_{month:02d}.nc")
 
-    file_path = os.path.join("data", "era5_raw", str(year), f"era5_{year}_{month:02d}.nc") # Path hardcoded
-    ds = xr.open_dataset(file_path)
+    if os.path.isfile(clean_path):
+        ds = xr.open_dataset(clean_path)
+        time_dim = "valid_time" if "valid_time" in ds.dims else "time"
+        if time_dim == "time":
+            ds = ds.rename({"time": "valid_time"})
+        ds = ds.sel(valid_time=ds.valid_time.dt.month == month)
+    else:
+        ds = xr.open_dataset(raw_path)
 
-    subset = ds #.sel(valid_time = ds.valid_time.dt.hour.isin(hours))
-
-    trimmed = subset.isel(latitude=slice(0,64), longitude=slice(0,64))
+    subset = ds
+    trimmed = subset.isel(latitude=slice(0, 64), longitude=slice(0, 64))
 
     batched = (
         trimmed.coarsen(valid_time=nhours, boundary='trim')
-        .construct(valid_time=('batch','step'))
+        .construct(valid_time=('batch', 'step'))
     )
 
-    data = batched[vars].to_array(dim='channel').transpose('batch', 'step', 'channel', 'latitude', 'longitude')
+    vars_to_use = list(ERA5_CORE_VARS)
+    if use_optional_vars:
+        vars_to_use += [v for v in ERA5_OPTIONAL_VARS if v in batched.data_vars]
+    vars_to_use = [v for v in vars_to_use if v in batched.data_vars]
+    if not vars_to_use:
+        raise ValueError(f"No expected variables found in data (need at least one of {ERA5_CORE_VARS})")
 
+    data = batched[vars_to_use].to_array(dim='channel').transpose('batch', 'step', 'channel', 'latitude', 'longitude')
     time_index = batched['valid_time'].isel(step=0).values
-
+    ds.close()
     return data, time_index
 
 def align_dates(era5, labels, target_col = "TMAX", lag_days = 5):
@@ -70,23 +90,29 @@ def align_dates(era5, labels, target_col = "TMAX", lag_days = 5):
     return valid_mask, final_labels
 
 class ERA5Dataset(Dataset):
-    def __init__(self, years, window_size = 5, max_or_min='max'):
+    def __init__(self, years, window_size=5, max_or_min='max', data_root="data", use_optional_vars=True):
         """
         ERA5 Dataset for loading ERA5 weather data and corresponding Central Park daily max/min temperatures.
-        :param years: List of years to include in the dataset. Will start on Jan 1 and end on Dec 31 of the specified years.
-        :param max_or_min: 'max' for daily max temperatures, 'min' for daily min temperatures.
+        Uses clean_data/era5_YYYY.nc when present (combined files, may include ssrd/tcc).
+
+        :param years: List of years to include in the dataset.
+        :param window_size: Number of consecutive days per sample.
+        :param max_or_min: 'max' for daily max temperatures, 'min' for daily min.
+        :param data_root: Root data directory (default "data").
+        :param use_optional_vars: If True (default), include ssrd/tcc when present (7 channels); else 5.
         """
         data = []
         time_index = []
 
         for year in years:
             for month in range(1, 13):
-                era5_data, era5_time_index = load_era5(month, year)
+                era5_data, era5_time_index = load_era5(month, year, data_root=data_root, use_optional_vars=use_optional_vars)
                 data.append(era5_data.values)
                 time_index.append(era5_time_index)
 
         data = np.concatenate(data, axis=0)
         self.data, self.mean, self.std = z_score_normalize(data)
+        self.n_channels = self.data.shape[2]
 
         time_index = np.concatenate(time_index, axis=0)
 
