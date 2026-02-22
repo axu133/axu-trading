@@ -149,10 +149,12 @@ class ERA5Dataset(Dataset):
                 continue # Otherwise gaps exist
 
             target_date = end_date + pd.Timedelta(days=1)
-            if target_date in all_targets.index:
+            prev_date = target_date - pd.Timedelta(days=1)
+            if target_date in all_targets.index and prev_date in all_targets.index:
                 target_val = all_targets.loc[target_date, target_col]
-                if not pd.isna(target_val):
-                    self.valid_samples.append((i, target_val))
+                baseline_val = all_targets.loc[prev_date, target_col]
+                if not pd.isna(target_val) and not pd.isna(baseline_val):
+                    self.valid_samples.append((i, target_val, baseline_val))
             
         if len(self.valid_samples) == 0:
             raise ValueError("No valid samples found. Check your data and date alignment.")
@@ -161,7 +163,7 @@ class ERA5Dataset(Dataset):
         return len(self.valid_samples)
     
     def __getitem__(self, idx):
-        start_idx, target_val = self.valid_samples[idx]
+        start_idx, target_val, baseline_val = self.valid_samples[idx]
 
         seq = self.data[start_idx: start_idx + self.window_size] # [Days, Steps, Channels, Lat, Long]
 
@@ -172,14 +174,10 @@ class ERA5Dataset(Dataset):
         C, D, S, H, W = x.shape
         x = x.reshape(C, D * S, H, W) # [Channels, Time (Days * Steps), Lat, Long]
 
-        previous_day_target_norm = x[0, -nhours:, :, :].max().item()
-        
-        previous_day_target = previous_day_target_norm * self.std[0] + self.mean[0] - 273.15 # Unnormalizes, converts K to C
-
-        residual = target_val - previous_day_target
+        residual = target_val - baseline_val
 
         target = torch.tensor(residual, dtype=torch.float32)
-        baseline = torch.tensor(previous_day_target, dtype=torch.float32)
+        baseline = torch.tensor(baseline_val, dtype=torch.float32)
         return x, target, baseline
 
 

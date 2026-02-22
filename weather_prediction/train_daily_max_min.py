@@ -39,7 +39,7 @@ if __name__ == "__main__":
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory = True)
     test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory = True)
 
-    lr = 3e-4
+    lr = 1e-4
     weight_decay = 1e-4
     num_epochs = 500
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
@@ -57,7 +57,8 @@ if __name__ == "__main__":
         model.train()
         t1 = default_timer()
         total_train_loss = 0.0
-        
+        total_train_mae = 0.0
+
         for batch_data, batch_target, batch_baseline in train_loader:
             batch_data, batch_target, batch_baseline = (batch_data.to(device), 
                                                             batch_target.to(device).view(-1, 1), 
@@ -78,9 +79,11 @@ if __name__ == "__main__":
             scaler.update()
             
             total_train_loss += loss.item() * batch_data.size(0)
+            total_train_mae += (y.detach().float() - batch_target).abs().sum().item()
         
         model.eval()
         total_test_loss = 0.0
+        total_test_mae = 0.0
         with torch.no_grad():
             for batch_data, batch_target, batch_baseline in test_loader:
                 batch_data, batch_target, batch_baseline = (batch_data.to(device), 
@@ -90,9 +93,12 @@ if __name__ == "__main__":
                 preds = model(batch_data)
                 loss = loss_fn(preds, batch_target)
                 total_test_loss += loss.item() * batch_data.size(0)
+                total_test_mae += (preds - batch_target).abs().sum().item()
             
         avg_train_loss = total_train_loss / train_size
         avg_test_loss = total_test_loss / test_size
+        avg_train_mae = total_train_mae / train_size
+        avg_test_mae = total_test_mae / test_size
 
         train_losses.append(avg_train_loss)
         test_losses.append(avg_test_loss)
@@ -102,7 +108,9 @@ if __name__ == "__main__":
             best_model_state = copy.deepcopy(model)
         
         scheduler.step(avg_test_loss)
-        print(f"Epoch: {i + 1}, Avg Train Loss: {avg_train_loss}, Avg Test Loss: {avg_test_loss}, LR: {scheduler.get_last_lr()}, Time taken: {default_timer()-t1}")
+        lr = scheduler.get_last_lr()[0]
+        elapsed = default_timer() - t1
+        print(f"Epoch: {i + 1:3d}, Train Loss: {avg_train_loss:8.4f}, Test Loss: {avg_test_loss:8.4f}, Train MAE: {avg_train_mae:8.4f}, Test MAE: {avg_test_mae:8.4f}, LR: {lr:10.2e}, Time: {elapsed:6.1f}s")
 
         if stopper(avg_test_loss):
             print("Early stopping triggered.")
