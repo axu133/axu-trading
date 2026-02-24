@@ -39,7 +39,7 @@ if __name__ == "__main__":
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory = True)
     test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory = True)
 
-    lr = 1e-4
+    lr = 5e-4
     weight_decay = 1e-4
     num_epochs = 500
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
@@ -112,9 +112,11 @@ if __name__ == "__main__":
         elapsed = default_timer() - t1
         print(f"Epoch: {i + 1:3d}, Train Loss: {avg_train_loss:8.4f}, Test Loss: {avg_test_loss:8.4f}, Train MAE: {avg_train_mae:8.4f}, Test MAE: {avg_test_mae:8.4f}, LR: {lr:10.2e}, Time: {elapsed:6.1f}s")
 
+        """
         if stopper(avg_test_loss):
             print("Early stopping triggered.")
             break
+        """
 
     model_path = os.path.join(model_directory, f'daily_max_model_{min(years)}-{max(years)}_{min_or_max}{comments}{date_str}.pth')
     torch.save(best_model_state.state_dict(), model_path)
