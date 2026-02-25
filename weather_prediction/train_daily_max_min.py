@@ -40,7 +40,7 @@ if __name__ == "__main__":
     test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory = True)
 
     lr = 5e-4
-    weight_decay = 1e-4
+    weight_decay = 5e-4  # stronger L2 regularization
     num_epochs = 500
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=8, factor=0.5)

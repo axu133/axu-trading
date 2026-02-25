@@ -67,7 +67,7 @@ class WeatherResNet3D(nn.Module):
             nn.Flatten(),
             nn.Linear(64, 32),
             nn.ReLU(),
-            nn.Dropout(0.0),
+            nn.Dropout(0.2),  # stronger regularization in head
             nn.Linear(32, 1)
         )
 
