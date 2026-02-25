@@ -27,7 +27,7 @@ if __name__ == "__main__":
         model = nn.DataParallel(model)
         
     model = model.to(device)
-    stopper = EarlyStopping(patience=10, min_delta=0.0001)
+    stopper = EarlyStopping(patience=40, min_delta=0.0001)  # stop only after 40 epochs without test-loss improvement
 
     total_samples = len(dataset)
     train_size = int(0.8 * total_samples)
@@ -112,11 +112,9 @@ if __name__ == "__main__":
         elapsed = default_timer() - t1
         print(f"Epoch: {i + 1:3d}, Train Loss: {avg_train_loss:8.4f}, Test Loss: {avg_test_loss:8.4f}, Train MAE: {avg_train_mae:8.4f}, Test MAE: {avg_test_mae:8.4f}, LR: {lr:10.2e}, Time: {elapsed:6.1f}s")
 
-        """
         if stopper(avg_test_loss):
             print("Early stopping triggered.")
             break
-        """
 
     model_path = os.path.join(model_directory, f'daily_max_model_{min(years)}-{max(years)}_{min_or_max}{comments}{date_str}.pth')
     torch.save(best_model_state.state_dict(), model_path)
