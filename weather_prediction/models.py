@@ -60,6 +60,7 @@ class WeatherResNet3D(nn.Module):
         self.layer1 = ResidualBlock(64)
         self.layer2 = ResidualBlock(64)
         self.layer3 = ResidualBlock(64)
+        self.layer4 = ResidualBlock(64)  # extra block for more capacity
 
         self.pool = nn.AdaptiveAvgPool3d((1, 1, 1))
 
@@ -67,7 +68,7 @@ class WeatherResNet3D(nn.Module):
             nn.Flatten(),
             nn.Linear(64, 32),
             nn.ReLU(),
-            nn.Dropout(0.2),  # stronger regularization in head
+            nn.Dropout(0.1),  # moderate regularization in head
             nn.Linear(32, 1)
         )
 
@@ -76,6 +77,7 @@ class WeatherResNet3D(nn.Module):
         x = self.layer1(x)
         x = self.layer2(x)
         x = self.layer3(x)
+        x = self.layer4(x)
 
         x = self.pool(x)
         x = self.fc(x)
