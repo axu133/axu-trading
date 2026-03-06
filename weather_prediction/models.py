@@ -49,7 +49,26 @@ class ResidualBlock(nn.Module):
         out += residual
         out = self.relu(out)
         return out
-    
+
+
+class TemporalBlock(nn.Module):
+    """1D conv along the time dimension (kernel over T only) with residual."""
+    def __init__(self, channels, kernel_size=3):
+        super().__init__()
+        padding = kernel_size // 2
+        self.conv = nn.Conv3d(channels, channels, kernel_size=(kernel_size, 1, 1), padding=(padding, 0, 0))
+        self.bn = nn.BatchNorm3d(channels)
+        self.relu = nn.ReLU(inplace=True)
+
+    def forward(self, x):
+        residual = x
+        out = self.conv(x)
+        out = self.bn(out)
+        out += residual
+        out = self.relu(out)
+        return out
+
+
 class WeatherResNet3D(nn.Module):
     def __init__(self, input_channels = 5, input_frames = 20):
         super().__init__()
@@ -61,6 +80,7 @@ class WeatherResNet3D(nn.Module):
         self.layer2 = ResidualBlock(64)
         self.layer3 = ResidualBlock(64)
         self.layer4 = ResidualBlock(64)  # extra block for more capacity
+        self.temporal = TemporalBlock(64, kernel_size=3)  # 1D conv along time
 
         self.pool = nn.AdaptiveAvgPool3d((1, 1, 1))
 
@@ -78,6 +98,7 @@ class WeatherResNet3D(nn.Module):
         x = self.layer2(x)
         x = self.layer3(x)
         x = self.layer4(x)
+        x = self.temporal(x)
 
         x = self.pool(x)
         x = self.fc(x)

@@ -27,7 +27,7 @@ if __name__ == "__main__":
         model = nn.DataParallel(model)
         
     model = model.to(device)
-    stopper = EarlyStopping(patience=40, min_delta=0.0001)  # stop only after 40 epochs without test-loss improvement
+    stopper = EarlyStopping(patience=55, min_delta=0.0001)  # allow more LR drops before stopping
 
     total_samples = len(dataset)
     train_size = int(0.8 * total_samples)
@@ -39,7 +39,7 @@ if __name__ == "__main__":
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory = True)
     test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory = True)
 
-    lr = 5e-4
+    lr = 3e-4  # lower initial LR for finer convergence
     weight_decay = 2e-4  # moderate L2 regularization
     num_epochs = 500
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
