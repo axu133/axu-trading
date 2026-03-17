@@ -29,8 +29,16 @@ def z_score_normalize(data, mean=None, std=None):
     """
     if mean is None:
         mean = np.mean(data, axis=(0, 1, 3, 4), keepdims=True)
+    else:
+        mean = np.asarray(mean)
+        if mean.ndim == 1:
+            mean = mean.reshape(1, 1, -1, 1, 1)
     if std is None:
         std = np.std(data, axis=(0, 1, 3, 4), keepdims=True)
+    else:
+        std = np.asarray(std)
+        if std.ndim == 1:
+            std = std.reshape(1, 1, -1, 1, 1)
         
     safe_std = std + 1e-8
     

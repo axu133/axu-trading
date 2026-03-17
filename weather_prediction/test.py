@@ -1,8 +1,15 @@
 import torch
 import torch.nn as nn
 import numpy as np
-from read_data import ERA5Dataset
-from models import WeatherResNet3D  # Removed Weather3DCNN, EarlyStopping as not needed for inference
+try:
+    from .read_data import ERA5Dataset
+    from .models import WeatherResNet3D  # Removed Weather3DCNN, EarlyStopping as not needed for inference
+except ImportError as e:  # pragma: no cover
+    if "relative import" in str(e) or "no known parent package" in str(e):
+        from weather_prediction.read_data import ERA5Dataset
+        from weather_prediction.models import WeatherResNet3D  # Removed Weather3DCNN, EarlyStopping as not needed for inference
+    else:
+        raise
 from timeit import default_timer
 import os
 
@@ -72,24 +79,26 @@ if __name__ == "__main__":
     all_preds = []
     all_targets = []
     all_baselines = []
+    all_doy = []
 
     t1 = default_timer()
     
     with torch.no_grad():
-        for batch_idx, (batch_data, batch_target, batch_baseline) in enumerate(test_loader):
-            batch_data, batch_target, batch_baseline = (batch_data.to(device), 
-                                                        batch_target.to(device).view(-1, 1), 
-                                                        batch_baseline.to(device).view(-1, 1))    
+        for batch_idx, (batch_data, batch_target_abs, batch_baseline_abs, batch_doy, batch_year) in enumerate(test_loader):
+            batch_data = batch_data.to(device)
+            batch_target_abs = batch_target_abs.to(device).view(-1, 1)
+            batch_baseline_abs = batch_baseline_abs.to(device).view(-1, 1)
 
             preds = model(batch_data)
-            loss = loss_fn(preds, batch_target)
+            loss = loss_fn(preds, batch_target_abs)
             total_test_loss += loss.item() * batch_data.size(0)
             
             # Store first batch for detailed inspection
             if batch_idx == 0:
                 all_preds = preds.cpu().numpy().flatten()
-                all_targets = batch_target.cpu().numpy().flatten()
-                all_baselines = batch_baseline.cpu().numpy().flatten()
+                all_targets = batch_target_abs.cpu().numpy().flatten()
+                all_baselines = batch_baseline_abs.cpu().numpy().flatten()
+                all_doy = batch_doy.cpu().numpy().flatten()
 
     avg_test_loss = total_test_loss / test_size
     
@@ -100,7 +109,7 @@ if __name__ == "__main__":
     print("\n" + "="*60)
     print("SAMPLE PREDICTIONS (First 10 items of first batch)")
     print("="*60)
-    print(f"{'Baseline':<12} | {'Target':<12} | {'Prediction':<12} | {'Diff (Pred-Tgt)':<15}")
+    print(f"{'Baseline':<12} | {'Target':<12} | {'Prediction':<12} | {'DOY':<5} | {'Abs Err':<10}")
     print("-" * 60)
     
     # Print first 10 samples
@@ -108,7 +117,8 @@ if __name__ == "__main__":
         p = all_preds[j]
         t = all_targets[j]
         b = all_baselines[j]
-        print(f"{b:<12.4f} | {t:<12.4f} | {p:<12.4f} | {abs(p - t):<15.4f}")
+        d = int(all_doy[j]) if len(all_doy) else -1
+        print(f"{b:<12.4f} | {t:<12.4f} | {p:<12.4f} | {d:<5d} | {abs(p - t):<10.4f}")
 
     print("-" * 60)
 

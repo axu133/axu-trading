@@ -4,7 +4,12 @@ import pandas as pd
 import os
 import xarray as xr
 import numpy as np
-from preprocess import z_score_normalize
+try:
+    # When imported as a package (recommended).
+    from .preprocess import z_score_normalize
+except ImportError:  # pragma: no cover
+    # When run as a script from within the folder.
+    from preprocess import z_score_normalize
 
 hours = range(0, 24) #[0, 6, 12, 18]
 nhours = len(hours)
@@ -90,7 +95,17 @@ def align_dates(era5, labels, target_col = "TMAX", lag_days = 5):
     return valid_mask, final_labels
 
 class ERA5Dataset(Dataset):
-    def __init__(self, years, window_size=5, max_or_min='max', data_root="data", use_optional_vars=True):
+    def __init__(
+        self,
+        years,
+        window_size=5,
+        max_or_min='max',
+        data_root="data",
+        use_optional_vars=True,
+        normalize=False,
+        mean=None,
+        std=None,
+    ):
         """
         ERA5 Dataset for loading ERA5 weather data and corresponding Central Park daily max/min temperatures.
         Uses clean_data/era5_YYYY.nc when present (combined files, may include ssrd/tcc).
@@ -111,8 +126,14 @@ class ERA5Dataset(Dataset):
                 time_index.append(era5_time_index)
 
         data = np.concatenate(data, axis=0)
-        self.data, self.mean, self.std = z_score_normalize(data)
-        self.n_channels = self.data.shape[2]
+        self.raw_data = data
+        self.n_channels = self.raw_data.shape[2]
+        self.data = self.raw_data
+        self.mean = None
+        self.std = None
+        self.normalize = False
+        if normalize:
+            self.apply_normalization(mean=mean, std=std)
 
         time_index = np.concatenate(time_index, axis=0)
 
@@ -126,6 +147,7 @@ class ERA5Dataset(Dataset):
             raise ValueError("max_or_min must be 'max' or 'min'")
 
         self.window_size = window_size
+        # Each entry: (start_idx, target_abs, baseline_abs, target_doy, target_year)
         self.valid_samples = []
 
         if 'DATE' in all_targets.columns:
@@ -138,6 +160,7 @@ class ERA5Dataset(Dataset):
         if era5_dates.tz is not None:
             era5_dates.tz = era5_dates.tz_localize(None)
         era5_dates = era5_dates.normalize()
+        self.era5_dates = era5_dates
 
         for i in range(len(self.data) - self.window_size):
             start_date = era5_dates[i]
@@ -148,22 +171,46 @@ class ERA5Dataset(Dataset):
             if end_date != expected_end:
                 continue # Otherwise gaps exist
 
-            target_date = end_date + pd.Timedelta(days=1)
-            prev_date = target_date - pd.Timedelta(days=1)
+            target_date = end_date + pd.Timedelta(days=1)  # predict next day
+            prev_date = target_date - pd.Timedelta(days=1)  # persistence baseline
             if target_date in all_targets.index and prev_date in all_targets.index:
                 target_val = all_targets.loc[target_date, target_col]
                 baseline_val = all_targets.loc[prev_date, target_col]
                 if not pd.isna(target_val) and not pd.isna(baseline_val):
-                    self.valid_samples.append((i, target_val, baseline_val))
+                    target_doy = int(target_date.dayofyear)
+                    target_year = int(target_date.year)
+                    self.valid_samples.append((i, float(target_val), float(baseline_val), target_doy, target_year))
             
         if len(self.valid_samples) == 0:
             raise ValueError("No valid samples found. Check your data and date alignment.")
+
+    def fit_normalization_for_years(self, years_subset):
+        """
+        Fit z-score normalization parameters using only ERA5 time slices whose date falls within years_subset.
+        This avoids leaking distribution info from val/test years into training.
+        """
+        years_subset = set(int(y) for y in years_subset)
+        years_arr = self.era5_dates.year.values
+        mask = np.isin(years_arr, list(years_subset))
+        if not np.any(mask):
+            raise ValueError("No ERA5 timesteps matched the requested years_subset for normalization.")
+        data = self.raw_data[mask]
+        mean = np.mean(data, axis=(0, 1, 3, 4), keepdims=True)
+        std = np.std(data, axis=(0, 1, 3, 4), keepdims=True) + 1e-8
+        return mean.flatten(), std.flatten()
+
+    def apply_normalization(self, mean=None, std=None):
+        """
+        Apply z-score normalization using provided mean/std (flattened per-channel) or fit from current data.
+        """
+        self.data, self.mean, self.std = z_score_normalize(self.raw_data, mean=mean, std=std)
+        self.normalize = True
 
     def __len__(self):
         return len(self.valid_samples)
     
     def __getitem__(self, idx):
-        start_idx, target_val, baseline_val = self.valid_samples[idx]
+        start_idx, target_abs, baseline_abs, target_doy, target_year = self.valid_samples[idx]
 
         seq = self.data[start_idx: start_idx + self.window_size] # [Days, Steps, Channels, Lat, Long]
 
@@ -174,11 +221,11 @@ class ERA5Dataset(Dataset):
         C, D, S, H, W = x.shape
         x = x.reshape(C, D * S, H, W) # [Channels, Time (Days * Steps), Lat, Long]
 
-        residual = target_val - baseline_val
-
-        target = torch.tensor(residual, dtype=torch.float32)
-        baseline = torch.tensor(baseline_val, dtype=torch.float32)
-        return x, target, baseline
+        target = torch.tensor(target_abs, dtype=torch.float32)
+        baseline = torch.tensor(baseline_abs, dtype=torch.float32)
+        doy = torch.tensor(target_doy, dtype=torch.int64)
+        year = torch.tensor(target_year, dtype=torch.int64)
+        return x, target, baseline, doy, year
 
 
 if __name__ == "__main__":

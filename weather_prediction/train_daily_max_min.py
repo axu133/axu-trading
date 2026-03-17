@@ -2,8 +2,15 @@ import torch
 from torch.amp import autocast, GradScaler
 import torch.nn as nn
 import numpy as np
-from read_data import ERA5Dataset
-from models import Weather3DCNN, EarlyStopping, WeatherResNet3D
+try:
+    from .read_data import ERA5Dataset
+    from .models import Weather3DCNN, EarlyStopping, WeatherResNet3D
+except ImportError as e:  # pragma: no cover
+    if "relative import" in str(e) or "no known parent package" in str(e):
+        from weather_prediction.read_data import ERA5Dataset
+        from weather_prediction.models import Weather3DCNN, EarlyStopping, WeatherResNet3D
+    else:
+        raise
 from timeit import default_timer
 import copy
 from datetime import date
@@ -19,7 +26,16 @@ years = range(1980, 2026)
 comments = "_Radiation_"
 
 if __name__ == "__main__":
-    dataset = ERA5Dataset(years=years, window_size=5, max_or_min=min_or_max)
+    # Forecast-realistic split (by target year, not random).
+    train_years = range(1980, 2018)   # 1980-2017
+    val_years = range(2018, 2022)     # 2018-2021
+    test_years = range(2022, 2026)    # 2022-2025
+
+    dataset = ERA5Dataset(years=years, window_size=5, max_or_min=min_or_max, normalize=False)
+
+    # Fit normalization ONLY on training years (no leakage), then apply to full dataset.
+    train_mean, train_std = dataset.fit_normalization_for_years(train_years)
+    dataset.apply_normalization(mean=train_mean, std=train_std)
 
     model = WeatherResNet3D(input_channels=dataset.n_channels, input_frames=20)
     
@@ -29,15 +45,42 @@ if __name__ == "__main__":
     model = model.to(device)
     stopper = EarlyStopping(patience=55, min_delta=0.0001)  # allow more LR drops before stopping
 
-    total_samples = len(dataset)
-    train_size = int(0.8 * total_samples)
-    test_size = total_samples - train_size
-    train_dataset, test_dataset = torch.utils.data.random_split(dataset, [train_size, test_size])
+    indices_train, indices_val, indices_test = [], [], []
+    for idx in range(len(dataset)):
+        _, _, _, _, y = dataset.valid_samples[idx]
+        if y in train_years:
+            indices_train.append(idx)
+        elif y in val_years:
+            indices_val.append(idx)
+        elif y in test_years:
+            indices_test.append(idx)
+
+    train_dataset = torch.utils.data.Subset(dataset, indices_train)
+    val_dataset = torch.utils.data.Subset(dataset, indices_val)
+    test_dataset = torch.utils.data.Subset(dataset, indices_test)
+
+    train_size = len(train_dataset)
+    val_size = len(val_dataset)
+    test_size = len(test_dataset)
 
     batch_size = 32
 
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory = True)
-    test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory = True)
+    val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=4, pin_memory = True)
+    test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=4, pin_memory = True)
+
+    # Climatology baseline: mean TMAX by day-of-year computed from TRAIN split only (no leakage).
+    clim_sum = np.zeros(367, dtype=np.float64)
+    clim_cnt = np.zeros(367, dtype=np.int64)
+    for i in range(len(train_dataset)):
+        _, y_abs, _, doy, _ = train_dataset[i]
+        d = int(doy)
+        if 1 <= d <= 366:
+            clim_sum[d] += float(y_abs)
+            clim_cnt[d] += 1
+    clim_mean_by_doy = np.full(367, np.nan, dtype=np.float32)
+    valid = clim_cnt > 0
+    clim_mean_by_doy[valid] = (clim_sum[valid] / clim_cnt[valid]).astype(np.float32)
 
     lr = 3e-4  # lower initial LR for finer convergence
     weight_decay = 2e-4  # moderate L2 regularization
@@ -57,18 +100,21 @@ if __name__ == "__main__":
         model.train()
         t1 = default_timer()
         total_train_loss = 0.0
-        total_train_mae = 0.0
+        total_train_mae_abs = 0.0
+        total_train_mae_persistence = 0.0
+        total_train_mae_climatology = 0.0
 
-        for batch_data, batch_target, batch_baseline in train_loader:
-            batch_data, batch_target, batch_baseline = (batch_data.to(device), 
-                                                            batch_target.to(device).view(-1, 1), 
-                                                            batch_baseline.to(device).view(-1, 1))  
+        for batch_data, batch_target_abs, batch_baseline_abs, batch_doy, batch_year in train_loader:
+            batch_data = batch_data.to(device)
+            batch_target_abs = batch_target_abs.to(device).view(-1, 1)
+            batch_baseline_abs = batch_baseline_abs.to(device).view(-1, 1)
+            batch_doy = batch_doy.to(device).view(-1)
             
             optimizer.zero_grad()
             
             with autocast(device_type='cuda', dtype=torch.float16):
                 y = model(batch_data)
-                loss = loss_fn(y, batch_target)
+                loss = loss_fn(y, batch_target_abs)
                 
             scaler.scale(loss).backward()
             
@@ -79,38 +125,72 @@ if __name__ == "__main__":
             scaler.update()
             
             total_train_loss += loss.item() * batch_data.size(0)
-            total_train_mae += (y.detach().float() - batch_target).abs().sum().item()
+            y_f = y.detach().float()
+            total_train_mae_abs += (y_f - batch_target_abs).abs().sum().item()
+            total_train_mae_persistence += (batch_baseline_abs - batch_target_abs).abs().sum().item()
+            batch_clim = torch.from_numpy(clim_mean_by_doy[batch_doy.detach().cpu().numpy()]).to(device).view(-1, 1)
+            total_train_mae_climatology += (batch_clim - batch_target_abs).abs().sum().item()
         
-        model.eval()
-        total_test_loss = 0.0
-        total_test_mae = 0.0
-        with torch.no_grad():
-            for batch_data, batch_target, batch_baseline in test_loader:
-                batch_data, batch_target, batch_baseline = (batch_data.to(device), 
-                                                            batch_target.to(device).view(-1, 1), 
-                                                            batch_baseline.to(device).view(-1, 1))    
+        def eval_loader(loader):
+            total_loss = 0.0
+            total_mae_abs = 0.0
+            total_mae_persistence = 0.0
+            total_mae_climatology = 0.0
+            n = 0
+            with torch.no_grad():
+                for batch_data, batch_target_abs, batch_baseline_abs, batch_doy, batch_year in loader:
+                    batch_data = batch_data.to(device)
+                    batch_target_abs = batch_target_abs.to(device).view(-1, 1)
+                    batch_baseline_abs = batch_baseline_abs.to(device).view(-1, 1)
+                    batch_doy = batch_doy.to(device).view(-1)
 
-                preds = model(batch_data)
-                loss = loss_fn(preds, batch_target)
-                total_test_loss += loss.item() * batch_data.size(0)
-                total_test_mae += (preds - batch_target).abs().sum().item()
+                    preds = model(batch_data)
+                    loss = loss_fn(preds, batch_target_abs)
+                    bs = batch_data.size(0)
+                    n += bs
+                    total_loss += loss.item() * bs
+                    preds_f = preds.detach().float()
+                    total_mae_abs += (preds_f - batch_target_abs).abs().sum().item()
+                    total_mae_persistence += (batch_baseline_abs - batch_target_abs).abs().sum().item()
+                    batch_clim = torch.from_numpy(clim_mean_by_doy[batch_doy.detach().cpu().numpy()]).to(device).view(-1, 1)
+                    total_mae_climatology += (batch_clim - batch_target_abs).abs().sum().item()
+            return (
+                total_loss / max(n, 1),
+                total_mae_abs / max(n, 1),
+                total_mae_persistence / max(n, 1),
+                total_mae_climatology / max(n, 1),
+            )
+
+        model.eval()
+        avg_val_loss, avg_val_mae_abs, avg_val_mae_persist, avg_val_mae_climo = eval_loader(val_loader)
+        avg_test_loss, avg_test_mae_abs, avg_test_mae_persist, avg_test_mae_climo = eval_loader(test_loader)
             
         avg_train_loss = total_train_loss / train_size
-        avg_test_loss = total_test_loss / test_size
-        avg_train_mae = total_train_mae / train_size
-        avg_test_mae = total_test_mae / test_size
+        avg_train_mae_abs = total_train_mae_abs / train_size
+        avg_train_mae_persistence = total_train_mae_persistence / train_size
+        avg_train_mae_climatology = total_train_mae_climatology / train_size
+        avg_test_mae_abs = avg_test_mae_abs
+        avg_test_mae_persistence = avg_test_mae_persist
+        avg_test_mae_climatology = avg_test_mae_climo
 
         train_losses.append(avg_train_loss)
-        test_losses.append(avg_test_loss)
+        test_losses.append(avg_val_loss)
 
-        if avg_test_loss < min_test_loss:
-            min_test_loss = avg_test_loss
+        if avg_val_loss < min_test_loss:
+            min_test_loss = avg_val_loss
             best_model_state = copy.deepcopy(model)
         
-        scheduler.step(avg_test_loss)
+        scheduler.step(avg_val_loss)
         lr = scheduler.get_last_lr()[0]
         elapsed = default_timer() - t1
-        print(f"Epoch: {i + 1:3d}, Train Loss: {avg_train_loss:8.4f}, Test Loss: {avg_test_loss:8.4f}, Train MAE: {avg_train_mae:8.4f}, Test MAE: {avg_test_mae:8.4f}, LR: {lr:10.2e}, Time: {elapsed:6.1f}s")
+        print(
+            f"Epoch: {i + 1:3d}, "
+            f"Train Loss: {avg_train_loss:8.4f}, Val Loss: {avg_val_loss:8.4f}, "
+            f"Train MAE_abs: {avg_train_mae_abs:6.3f}, Val MAE_abs: {avg_val_mae_abs:6.3f}, "
+            f"Val MAE_persist: {avg_val_mae_persist:6.3f}, Val MAE_climo: {avg_val_mae_climo:6.3f}, "
+            f"Test MAE_abs: {avg_test_mae_abs:6.3f}, Test MAE_persist: {avg_test_mae_persistence:6.3f}, Test MAE_climo: {avg_test_mae_climatology:6.3f}, "
+            f"LR: {lr:10.2e}, Time: {elapsed:6.1f}s"
+        )
 
         if stopper(avg_test_loss):
             print("Early stopping triggered.")
