@@ -59,6 +59,14 @@ def load_era5(month, year, data_root="data", use_optional_vars=True):
         .construct(valid_time=('batch', 'step'))
     )
 
+    def _k_to_f(x):
+        return (x - 273.15) * (9.0 / 5.0) + 32.0
+
+    if "t2m" in batched.data_vars:
+        batched["t2m"] = _k_to_f(batched["t2m"])
+    if "d2m" in batched.data_vars:
+        batched["d2m"] = _k_to_f(batched["d2m"])
+
     vars_to_use = list(ERA5_CORE_VARS)
     if use_optional_vars:
         vars_to_use += [v for v in ERA5_OPTIONAL_VARS if v in batched.data_vars]
