@@ -1,0 +1,6 @@
+xarray
+cfgrib
+ecmwf-opendata
+requests
+pandas
+numpy
